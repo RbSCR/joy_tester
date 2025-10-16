@@ -94,9 +94,9 @@ class JoyTester(Node):
 
         self.tk = Tk()
 
-        self.canvas = Canvas(self.tk, width=800, height=480)
+        self.canvas = Canvas(self.tk, width=800, height=650)
         self.tk.title('Joystick Test')
-        self.tk.geometry('800x480+0+0')
+        self.tk.geometry('800x650+0+0')
         self.canvas.pack(anchor='nw')
 
         self.tk.update()
