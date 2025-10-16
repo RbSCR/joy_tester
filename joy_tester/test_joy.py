@@ -50,9 +50,9 @@ class JoyAxis:
         self.width = width
         self.i = i
 
-        lf = left_space + 60
+        lf = left_space + 80
         t = v_space + (height + v_space)*i
-        self.parent_canvas.create_text(left_space+50, t+height/2, text=str(i))
+        self.parent_canvas.create_text(left_space+70, t+height/2, text=str(i))
 
         self.fill_obj = self.parent_canvas.create_rectangle(lf,
                                                             t,
@@ -65,12 +65,12 @@ class JoyAxis:
                                                                t + height,
                                                                width=2, outline='black')
 
-        self.val_txt = self.parent_canvas.create_text(left_space+60 + width + 30,
+        self.val_txt = self.parent_canvas.create_text(left_space+80 + width + 30,
                                                       t+height/2,
                                                       text=str(i))
 
     def update_value(self, value):
-        lf = self.left_space + 60
+        lf = self.left_space + 80
         t = self.v_space + (self.height + self.v_space)*self.i
 
         ww = self.width * (value + 1)/2
