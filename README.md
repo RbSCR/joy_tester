@@ -34,7 +34,7 @@ ros2 run joy_tester send_rumble_feedback
 The node sends a rumble feedback every 5 seconds.
 Intensity of the rumble can be changed by changing the parameter 'intensity', default value is 0.4; range is 0.0 - 1.0.
 ```
-ros2 param set rumble_feedback intensity <value>
+ros2 param set rumble_feedback intensity <(double)value>
 ```
 
 ## To Do

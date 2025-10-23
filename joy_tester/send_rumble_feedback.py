@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from rcl_interfaces.msg import ParameterDescriptor
-
 import rclpy
+
 from rclpy.node import Node
-from rclpy.parameter_event_handler import ParameterEventHandler
+from rclpy.parameter import Parameter
+
+from rcl_interfaces.msg import SetParametersResult
+from rcl_interfaces.msg import ParameterDescriptor
 
 from sensor_msgs.msg import JoyFeedback
 
@@ -28,12 +30,8 @@ class RumbleFeedbackPublisher(Node):
 
         param_descriptor = ParameterDescriptor(description='Rumble intensity')
         self.declare_parameter('intensity', 0.4, param_descriptor)
-        self.handler = ParameterEventHandler(self)
-        self.callback_handle = self.handler.add_parameter_callback(
-            parameter_name='intensity',
-            node_name='rumble_feedback',
-            callback=self.param_callback,
-        )
+
+        self.add_on_set_parameters_callback(self.parameter_change_callback)
 
         self.intensity = self.get_parameter('intensity').value
 
@@ -41,22 +39,34 @@ class RumbleFeedbackPublisher(Node):
         timer_period = 5.0  # seconds
         self.timer = self.create_timer(timer_period, self.publish_timer_callback)
 
-    def param_callback(self, p: rclpy.parameter.Parameter) -> None:
-        param_value = rclpy.parameter.parameter_value_to_python(p.value)
-        self.get_logger().info(f'Received a parameter update: {p.name}: {param_value}')
+    def parameter_change_callback(self, params):
 
-        self.intensity = param_value
+        result = SetParametersResult()
 
-        if param_value < 0.0:
-            self.intensity = 0.00
-        if param_value > 1.0:
-            self.intensity = 1.00
-        if param_value != self.intensity:
-            self.get_logger().info(f'Parameter out of range, set to: {self.intensity}')
+        # Iterate over each parameter in this node
+        for param in params:
+            # Check the parameter's name and type
+            if param.name == 'intensity' and param.type_ == Parameter.Type.DOUBLE:
+                # This parameter has changed. Display the new value to the terminal.
+                self.get_logger().info('Parameter intensity changed to: %1.2f' % param.value)
+                # The parameter change was successfully handled.
+                result.successful = True
+
+                # Set new intensity and check the range
+                self.intensity = param.value
+
+                if param.value < 0.0:
+                    self.intensity = 0.00
+                if param.value > 1.0:
+                    self.intensity = 1.00
+                if param.value != self.intensity:
+                    self.get_logger().info(f'Parameter out of range, set to: {self.intensity}')
+
+        return result
 
     def publish_timer_callback(self):
         msg = JoyFeedback()
-        msg.type = 1
+        msg.type = JoyFeedback.TYPE_RUMBLE
         msg.id = 0
         msg.intensity = self.intensity
 
