@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import rclpy
 
+from rcl_interfaces.msg import ParameterDescriptor
+from rcl_interfaces.msg import SetParametersResult
+import rclpy
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.parameter import Parameter
-
-from rcl_interfaces.msg import SetParametersResult
-from rcl_interfaces.msg import ParameterDescriptor
 
 from sensor_msgs.msg import JoyFeedback
 
@@ -84,7 +84,9 @@ def main(args=None):
         rclpy.spin(rumble_feedback)
 
     except (KeyboardInterrupt):
-        pass
+        print('Received keyboard interrupt!')
+    except (ExternalShutdownException):
+        print('Received external shutdown request!')
     finally:
         # Destroy the node explicitly, if not already destroyed by the garbage collector
         if rumble_feedback is not None:
