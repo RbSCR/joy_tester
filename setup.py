@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'test_joy = joy_tester.test_joy:main',
+            'send_rumble_feedback = joy_tester.send_rumble_feedback:main',
         ],
     },
 )
