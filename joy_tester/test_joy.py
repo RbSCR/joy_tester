@@ -1,4 +1,5 @@
 # Copyright 2023 Josh Newans
+# Copyright 2025 RbSCR
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,27 +13,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-from tkinter import Canvas, Tk
+from tkinter import Canvas
+from tkinter import Tk
+from tkinter import ttk
 
 import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 
 from sensor_msgs.msg import Joy
+from sensor_msgs.msg import JoyFeedback
 
 
 class JoyButton:
-    def __init__(self, parent_canvas, left_space, v_space, height, i):
+    def __init__(self, parent_canvas, left_space, inner_space, width, vert_space, height, i):
         self.parent_canvas = parent_canvas
-        lf = left_space + 15
-        t = v_space + (height + v_space)*i
-        self.parent_canvas.create_text(left_space, t+height/2, text=str(i))
-        self.circle_obj = self.parent_canvas.create_oval(lf,
-                                                         t,
-                                                         lf + height,
-                                                         t + height,
-                                                         width=2, fill='white')
+        row = i % 8
+        col = i // 8
+        lf_text = left_space + (inner_space + width) * col
+        lf_circle = left_space + inner_space + (inner_space + width) * col
+        t = vert_space + (height + vert_space) * row
+
+        self.parent_canvas.create_text(lf_text, t+height/2, text=str(i))
+        self.circle_obj = self.parent_canvas.create_oval(lf_circle, t,
+                                                         lf_circle+height, t+height,
+                                                         width=1, fill='white')
 
     def update_value(self, value):
         if (value > 0):
@@ -42,85 +47,183 @@ class JoyButton:
 
 
 class JoyAxis:
-    def __init__(self, parent_canvas, left_space, v_space, height, width, i):
+    def __init__(self, parent_canvas, left_space, inner_space, width, vert_space, height, i):
         self.parent_canvas = parent_canvas
-        self.left_space = left_space
-        self.v_space = v_space
         self.height = height
         self.width = width
-        self.i = i
+        self.lf = left_space + inner_space
+        self.t = vert_space + (height + vert_space)*i
 
-        lf = left_space + 80
-        t = v_space + (height + v_space)*i
-        self.parent_canvas.create_text(left_space+70, t+height/2, text=str(i))
-
-        self.fill_obj = self.parent_canvas.create_rectangle(lf,
-                                                            t,
-                                                            lf + width,
-                                                            t + height,
+        self.parent_canvas.create_text(left_space, self.t+height/2, text=str(i))
+        dummy_value = 0.0
+        ww = width * (dummy_value + 1)/2
+        self.fill_obj = self.parent_canvas.create_rectangle(self.lf, self.t,
+                                                            self.lf+ww, self.t+height,
                                                             width=0, fill='green')
-        self.outline_obj = self.parent_canvas.create_rectangle(lf,
-                                                               t,
-                                                               lf + width,
-                                                               t + height,
-                                                               width=2, outline='black')
-
-        self.val_txt = self.parent_canvas.create_text(left_space+80 + width + 30,
-                                                      t+height/2,
-                                                      text=str(i))
+        self.outline_obj = self.parent_canvas.create_rectangle(self.lf, self.t,
+                                                               self.lf+width, self.t+height,
+                                                               width=1, outline='black')
+        self.val_txt = self.parent_canvas.create_text(self.lf+width+inner_space, self.t+height/2,
+                                                      anchor='w', text=str(f'{dummy_value:.5f}'))
 
     def update_value(self, value):
-        lf = self.left_space + 80
-        t = self.v_space + (self.height + self.v_space)*self.i
-
         ww = self.width * (value + 1)/2
+        self.parent_canvas.coords(self.fill_obj, self.lf, self.t, self.lf+ww, self.t+self.height)
+        self.parent_canvas.itemconfigure(self.val_txt, text=str(f'{value:.5f}'))
 
-        self.parent_canvas.coords(self.fill_obj, lf, t, lf+ww, t+self.height)
-        self.parent_canvas.itemconfigure(self.val_txt, text=str(f'{value:.3f}'))
+
+class Feedback:
+    def __init__(self, parent_canvas, left_space, inner_space, width, vert_space, height):
+        self.parent_canvas = parent_canvas
+        self.height = height
+        self.width = width
+        self.lf = left_space + inner_space + 60
+        self.t = vert_space
+
+        self.colors = ['green', 'orange', 'red', 'blue', 'yellow']
+        self.color_index = -1
+
+        self.parent_canvas.create_text(left_space, self.t+height/2, anchor='w', text='Intensity')
+
+        ww = 0.0
+        self.fill_obj = self.parent_canvas.create_rectangle(self.lf, self.t,
+                                                            self.lf+ww, self.t+height,
+                                                            width=0, fill='green')
+        self.outline_obj = self.parent_canvas.create_rectangle(self.lf, self.t,
+                                                               self.lf+width, self.t+height,
+                                                               width=1, outline='black')
+        self.val_txt = self.parent_canvas.create_text(self.lf+width+inner_space,
+                                                      self.t+height/2, anchor='w',
+                                                      text='No message')
+        self.parent_canvas.create_text(left_space, self.t+vert_space+height+height/2,
+                                       anchor='w', text='Received')
+        self.time_txt = self.parent_canvas.create_text(self.lf,
+                                                       self.t+vert_space+height+height/2,
+                                                       anchor='w', text='Not yet')
+
+    def update_value(self, value, time_stamp):
+        self.color_index = (self.color_index + 1) % len(self.colors)
+        fill_color = self.colors[self.color_index]
+        ww = self.width * value
+        secs, nsecs = time_stamp.seconds_nanoseconds()
+
+        self.parent_canvas.itemconfigure(self.fill_obj, fill=fill_color)
+        self.parent_canvas.coords(self.fill_obj, self.lf, self.t, self.lf+ww, self.t+self.height)
+        self.parent_canvas.itemconfigure(self.val_txt, text=str(f'{value:.2f}'))
+        self.parent_canvas.itemconfigure(self.time_txt, text=str(f'{secs}.{nsecs}'))
 
 
-class JoyTester(Node):
+class JoyTester_ng(Node):
 
     def __init__(self):
-        super().__init__('test_joy')
-        self.get_logger().info('Testing Joystick...')
+        super().__init__('test_joy_ng')
+        self.get_logger().info('Testing Joystick ...')
 
-        self.subscription = self.create_subscription(Joy, 'joy', self.joy_callback, 5)
-        self.subscription  # prevent unused variable warning
+        self.subscription_joy = self.create_subscription(Joy, 'joy', self.joy_callback, 5)
+        self.subscription_feedback = self.create_subscription(JoyFeedback,
+                                                              'joy/set_feedback',
+                                                              self.feedback_callback, 5)
 
         self.buttons = []
         self.axes = []
-        self.initialised = False
+        self.joy_objects_initialised = False
 
-        self.tk = Tk()
+        self.feedback = []
+        # Note [RbSCR]
+        # Currently only a rumble feedback (TYPE_RUMBLE / 1) is supported because
+        # the joy node (https://github.com/ros-drivers/joystick_drivers/tree/ros2/joy)
+        # also only supports a rumble feedback. In the future all three types
+        # could be supported here; hence self.feedback is implemented as a list.
 
-        self.canvas = Canvas(self.tk, width=800, height=650)
-        self.tk.title('Joystick Test')
-        self.tk.geometry('800x650+0+0')
-        self.canvas.pack(anchor='nw')
+        self.create_tk_root()
+        self.create_joy_frames()
 
+        # Note [RbSCR]
+        # When the device is known at startup (using a parameter (future functionality))
+        # the button and axes widgets could be initiated here to prevent an 'empty' frame.
+        # For example for a PS3:
+        # self.create_joy_button_widgets(17)
+        # self.create_joy_axes_widgets(6)
+        # self.joy_objects_initialised = True
+
+        self.create_feedback_frames()
         self.tk.update()
 
-    def joy_callback(self, joy_msg):
+    def create_tk_root(self):
+        """Create the tkinter root."""
+        self.tk = Tk()
+        self.tk.geometry('650x500+0+0')
+        self.tk.resizable(False, False)
+        self.tk.title('Joystick Testing')
+        self.tk.rowconfigure(0, weight=1)       # row for joy_frame
+        self.tk.rowconfigure(1, weight=1)       # row for feedback_frame
+        self.tk.columnconfigure(0, weight=1)
 
+    def create_joy_frames(self):
+        """Create the frames for joy topic data."""
+        self.joy_frame = ttk.Labelframe(self.tk, borderwidth=1, relief='solid',
+                                        padding=5, text='  Joy topic   ')
+        self.joy_frame.grid(column=0, row=0)
+
+        self.joy_frame.rowconfigure(0, weight=1)
+        self.joy_frame.columnconfigure(0, weight=1)     # column 0 for button_frame
+        self.joy_frame.columnconfigure(1, weight=1)     # column 1 for axes_frame
+
+        # Create frame and canvas for the 'joy'buttons
+        self.button_frame = ttk.Labelframe(self.joy_frame, relief='flat', text=' Buttons ')
+        self.button_frame.grid(column=0, row=0, sticky='NW')
+
+        self.button_frame.rowconfigure(0, weight=1)
+        self.button_frame.columnconfigure(0, weight=1)
+
+        self.button_canvas = Canvas(self.button_frame, width=275, background='lightgray')
+        self.button_canvas.grid(column=0, row=0)
+
+        # Create frame and canvas for the 'joy'axes
+        self.axes_frame = ttk.Labelframe(self.joy_frame, text=' Axes ', relief='flat')
+        self.axes_frame.grid(column=1, row=0, sticky='NW')
+
+        self.axes_frame.rowconfigure(0, weight=1)
+        self.axes_frame.columnconfigure(0, weight=1)
+
+        self.axes_canvas = Canvas(self.axes_frame, width=250, background='lightgray')
+        self.axes_canvas.grid(column=0, row=0)
+
+    def create_joy_button_widgets(self, button_count):
+        """Create the widgets for the buttons in the joy message."""
         left_space = 10
+        inner_space = 15
+        width = 70
         height = 25
-        width = 80
         v_space = 5
+        for i in range(0, button_count):
+            self.buttons.append(JoyButton(self.button_canvas, left_space, inner_space,
+                                          width, v_space, height, i))
 
+    def create_joy_axes_widgets(self, axes_count):
+        """Create the widgets for the axes in the joy message."""
+        left_space = 10
+        inner_space = 15
+        width = 100
+        height = 25
+        vert_space = 5
+        for i in range(0, axes_count):
+            self.axes.append(JoyAxis(self.axes_canvas, left_space, inner_space,
+                                     width, vert_space, height, i))
+
+    def joy_callback(self, joy_msg):
+        """Handle a receipt of a joy message."""
         # Handle first receive
+        if not self.joy_objects_initialised:
+            button_count = len(joy_msg.buttons)
+            self.create_joy_button_widgets(button_count)
 
-        if not self.initialised:
-            for i, val in enumerate(joy_msg.buttons):
-                self.buttons.append(JoyButton(self.canvas, left_space, v_space, height, i))
+            axes_count = len(joy_msg.axes)
+            self.create_joy_axes_widgets(axes_count)
 
-            for i, val in enumerate(joy_msg.axes):
-                self.axes.append(JoyAxis(self.canvas, left_space, v_space, height, width, i))
-
-            self.initialised = True
+            self.joy_objects_initialised = True
 
         # Update Values
-
         for i, val in enumerate(joy_msg.buttons):
             self.buttons[i].update_value(val)
 
@@ -129,16 +232,62 @@ class JoyTester(Node):
 
         # Redraw
         self.tk.update()
-
         return
+
+    def create_feedback_frames(self):
+        """Create the frame for the feedbackframes."""
+        self.feedback_frame = ttk.Labelframe(self.tk,
+                                             borderwidth=1, relief='solid',
+                                             padding=5, text='  Feedback topic   ')
+        self.feedback_frame.grid(column=0, row=1)
+
+        self.feedback_frame.rowconfigure(0, weight=1)
+        self.feedback_frame.columnconfigure(0, weight=1)     # column 0 for subscribe frame
+        self.feedback_frame.columnconfigure(1, weight=1)     # column 1 for publish frame
+
+        # create subscribe feedback frame
+        self.subscribe_frame = ttk.Labelframe(self.feedback_frame,
+                                              borderwidth=1, relief='solid',
+                                              padding=10, text=' Subscribe feedback ')
+        self.subscribe_frame.grid(column=0, row=0, sticky='NW')
+        self.subscribe_canvas = Canvas(self.subscribe_frame, width=300, height=100,
+                                       background='lightgray')
+        self.subscribe_canvas.pack()
+
+        left_space = 5
+        inner_space = 15
+        width = 100
+        height = 25
+        vert_space = 5
+        self.feedback.append(Feedback(self.subscribe_canvas, left_space, inner_space,
+                                      width, vert_space, height))
+        # Note [RbSCR]
+        # Feedback widgets are immediately created (in contrast to the button and axis widgets)
+        # because the number of widgets/feedback-types is known to be a fixed value.
+
+    def feedback_callback(self, set_feedback_msg):
+        """Handle a receipt of a set_feedback message."""
+        t_stamp = self.get_clock().now()
+        val = set_feedback_msg.intensity
+        self.feedback[0].update_value(val, t_stamp)
+
+        # Redraw
+        self.tk.update()
+        return
+
+        # Note [RbSCR]
+        # Code for the publish frame and widgets for publishing feedback
+        # messages should go here. But 'ROS spin' and 'Tk mainloop' don't
+        # work together (mainloop is needed for the UI interaction).
+        # A possible solution is to use asyncio.
 
 
 def main(args=None):
     rclpy.init(args=args)
-    joy_tester = JoyTester()
+    joy_tester_ng = JoyTester_ng()
 
     try:
-        rclpy.spin(joy_tester)
+        rclpy.spin(joy_tester_ng)
     except KeyboardInterrupt:
         print('Received keyboard interrupt!')
     except ExternalShutdownException:
@@ -146,5 +295,9 @@ def main(args=None):
 
     print('Exiting...')
 
-    joy_tester.destroy_node()
+    # and destry the ros node
     rclpy.try_shutdown()
+
+
+if __name__ == '__main__':
+    main()

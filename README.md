@@ -42,6 +42,6 @@ ros2 param set rumble_feedback intensity <(double)value>
 
 ## To Do
 
-- Clean up the code, particularly GUI element placement (was a very rough first go)
+- ~~Clean up the code, particularly GUI element placement (was a very rough first go)~~
 - Add functionality for sending `sensor_msgs/JoyFeedback` (e.g. LED, rumble) back to controllers
 - Some way to assist in calibration?
