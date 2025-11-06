@@ -52,7 +52,7 @@ class JoyAxis:
         self.height = height
         self.width = width
         self.lf = left_space + inner_space
-        self.t = vert_space + (height + vert_space)*i
+        self.t = vert_space + (height + vert_space) * i
 
         self.parent_canvas.create_text(left_space, self.t+height/2, text=str(i))
         dummy_value = 0.0
@@ -73,17 +73,25 @@ class JoyAxis:
 
 
 class Feedback:
-    def __init__(self, parent_canvas, left_space, inner_space, width, vert_space, height):
+    def __init__(self, parent_canvas, left_space, inner_space, width,
+                 vert_space, height, feedback_type):
         self.parent_canvas = parent_canvas
         self.height = height
         self.width = width
-        self.lf = left_space + inner_space + 60
-        self.t = vert_space
+        self.lf = left_space + inner_space + 40
+        self.t = vert_space + (height + vert_space) * feedback_type
 
         self.colors = ['green', 'orange', 'red', 'blue', 'yellow']
         self.color_index = -1
 
-        self.parent_canvas.create_text(left_space, self.t+height/2, anchor='w', text='Intensity')
+        if feedback_type == JoyFeedback.TYPE_LED:
+            type_txt = 'Led'
+        elif feedback_type == JoyFeedback.TYPE_RUMBLE:
+            type_txt = 'Rumble'
+        elif feedback_type == JoyFeedback.TYPE_BUZZER:
+            type_txt = 'Buzzer'
+
+        self.parent_canvas.create_text(left_space, self.t+height/2, anchor='w', text=type_txt)
 
         ww = 0.0
         self.fill_obj = self.parent_canvas.create_rectangle(self.lf, self.t,
@@ -94,12 +102,10 @@ class Feedback:
                                                                width=1, outline='black')
         self.val_txt = self.parent_canvas.create_text(self.lf+width+inner_space,
                                                       self.t+height/2, anchor='w',
-                                                      text='No message')
-        self.parent_canvas.create_text(left_space, self.t+vert_space+height+height/2,
-                                       anchor='w', text='Received')
-        self.time_txt = self.parent_canvas.create_text(self.lf,
-                                                       self.t+vert_space+height+height/2,
-                                                       anchor='w', text='Not yet')
+                                                      text=' ')
+        self.time_txt = self.parent_canvas.create_text(self.lf+width+(4*inner_space),
+                                                       self.t+height/2,
+                                                       anchor='w', text='No message yet ')
 
     def update_value(self, value, time_stamp):
         self.color_index = (self.color_index + 1) % len(self.colors)
@@ -110,7 +116,7 @@ class Feedback:
         self.parent_canvas.itemconfigure(self.fill_obj, fill=fill_color)
         self.parent_canvas.coords(self.fill_obj, self.lf, self.t, self.lf+ww, self.t+self.height)
         self.parent_canvas.itemconfigure(self.val_txt, text=str(f'{value:.2f}'))
-        self.parent_canvas.itemconfigure(self.time_txt, text=str(f'{secs}.{nsecs}'))
+        self.parent_canvas.itemconfigure(self.time_txt, text=str(f'at {secs}.{nsecs}'))
 
 
 class JoyTester_ng(Node):
@@ -250,7 +256,7 @@ class JoyTester_ng(Node):
                                               borderwidth=1, relief='solid',
                                               padding=10, text=' Subscribe feedback ')
         self.subscribe_frame.grid(column=0, row=0, sticky='NW')
-        self.subscribe_canvas = Canvas(self.subscribe_frame, width=300, height=100,
+        self.subscribe_canvas = Canvas(self.subscribe_frame, width=400, height=100,
                                        background='lightgray')
         self.subscribe_canvas.pack()
 
@@ -260,7 +266,11 @@ class JoyTester_ng(Node):
         height = 25
         vert_space = 5
         self.feedback.append(Feedback(self.subscribe_canvas, left_space, inner_space,
-                                      width, vert_space, height))
+                                      width, vert_space, height, JoyFeedback.TYPE_LED))
+        self.feedback.append(Feedback(self.subscribe_canvas, left_space, inner_space,
+                                      width, vert_space, height, JoyFeedback.TYPE_RUMBLE))
+        self.feedback.append(Feedback(self.subscribe_canvas, left_space, inner_space,
+                                      width, vert_space, height, JoyFeedback.TYPE_BUZZER))
         # Note [RbSCR]
         # Feedback widgets are immediately created (in contrast to the button and axis widgets)
         # because the number of widgets/feedback-types is known to be a fixed value.
@@ -268,8 +278,7 @@ class JoyTester_ng(Node):
     def feedback_callback(self, set_feedback_msg):
         """Handle a receipt of a set_feedback message."""
         t_stamp = self.get_clock().now()
-        val = set_feedback_msg.intensity
-        self.feedback[0].update_value(val, t_stamp)
+        self.feedback[set_feedback_msg.type].update_value(set_feedback_msg.intensity, t_stamp)
 
         # Redraw
         self.tk.update()
