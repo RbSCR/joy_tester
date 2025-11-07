@@ -133,13 +133,7 @@ class JoyTester_ng(Node):
         self.buttons = []
         self.axes = []
         self.joy_objects_initialised = False
-
         self.feedback = []
-        # Note [RbSCR]
-        # Currently only a rumble feedback (TYPE_RUMBLE / 1) is supported because
-        # the joy node (https://github.com/ros-drivers/joystick_drivers/tree/ros2/joy)
-        # also only supports a rumble feedback. In the future all three types
-        # could be supported here; hence self.feedback is implemented as a list.
 
         self.create_tk_root()
         self.create_joy_frames()
