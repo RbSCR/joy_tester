@@ -119,10 +119,10 @@ class Feedback:
         self.parent_canvas.itemconfigure(self.time_txt, text=str(f'at {secs}.{nsecs}'))
 
 
-class JoyTester_ng(Node):
+class JoyTester(Node):
 
     def __init__(self):
-        super().__init__('test_joy_ng')
+        super().__init__('test_joy')
         self.get_logger().info('Testing Joystick ...')
 
         self.subscription_joy = self.create_subscription(Joy, 'joy', self.joy_callback, 5)
@@ -287,10 +287,10 @@ class JoyTester_ng(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    joy_tester_ng = JoyTester_ng()
+    joy_tester = JoyTester()
 
     try:
-        rclpy.spin(joy_tester_ng)
+        rclpy.spin(joy_tester)
     except KeyboardInterrupt:
         print('Received keyboard interrupt!')
     except ExternalShutdownException:
