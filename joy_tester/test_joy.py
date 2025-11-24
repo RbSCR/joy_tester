@@ -130,23 +130,62 @@ class JoyTester(Node):
                                                               'joy/set_feedback',
                                                               self.feedback_callback, 5)
 
+        self.gui = Gui()
+
+    def joy_callback(self, joy_msg):
+        """Handle a receipt of a joy message."""
+        # Handle first receive
+        if not self.gui.joy_topic_objects_initialised:
+            button_count = len(joy_msg.buttons)
+            self.gui.create_joy_topic_button_widgets(button_count)
+
+            axes_count = len(joy_msg.axes)
+            self.gui.create_joy_topic_axes_widgets(axes_count)
+
+            self.gui.joy_topic_objects_initialised = True
+
+        # Update Values
+        for i, val in enumerate(joy_msg.buttons):
+            self.gui.buttons[i].update_value(val)
+
+        for i, val in enumerate(joy_msg.axes):
+            self.gui.axes[i].update_value(val)
+
+        # Redraw
+        self.gui.update()
+        return
+
+    def feedback_callback(self, set_feedback_msg):
+        """Handle a receipt of a set_feedback message."""
+        t_stamp = self.get_clock().now()
+        self.gui.feedback[set_feedback_msg.type].update_value(set_feedback_msg.intensity, t_stamp)
+
+        # Redraw
+        self.gui.update()
+        return
+
+
+class Gui():
+    def __init__(self):
+
         self.buttons = []
         self.axes = []
-        self.joy_objects_initialised = False
+        self.joy_topic_objects_initialised = False
         self.feedback = []
 
         self.create_tk_root()
-        self.create_joy_frames()
-
+        self.create_joy_topic_frames()
         # Note [RbSCR]
         # When the device is known at startup (using a parameter (future functionality))
         # the button and axes widgets could be initiated here to prevent an 'empty' frame.
         # For example for a PS3:
-        # self.create_joy_button_widgets(17)
-        # self.create_joy_axes_widgets(6)
-        # self.joy_objects_initialised = True
+        # self.create_joy_topic_button_widgets(17)
+        # self.create_joy_topic_axes_widgets(6)
+        # self.joy_topic_objects_initialised = True
+        self.create_feedback_topic_frames()
+        self.update()
 
-        self.create_feedback_frames()
+    def update(self):
         self.tk.update()
 
     def create_tk_root(self):
@@ -155,19 +194,19 @@ class JoyTester(Node):
         self.tk.geometry('650x500+0+0')
         self.tk.resizable(False, False)
         self.tk.title('Joystick Testing')
-        self.tk.rowconfigure(0, weight=1)       # row for joy_frame
-        self.tk.rowconfigure(1, weight=1)       # row for feedback_frame
+        self.tk.rowconfigure(0, weight=1)       # row 0: for joy_frame
+        self.tk.rowconfigure(1, weight=1)       # row 1: for feedback_frame
         self.tk.columnconfigure(0, weight=1)
 
-    def create_joy_frames(self):
+    def create_joy_topic_frames(self):
         """Create the frames for joy topic data."""
         self.joy_frame = ttk.Labelframe(self.tk, borderwidth=1, relief='solid',
                                         padding=5, text='  Joy topic   ')
         self.joy_frame.grid(column=0, row=0)
 
         self.joy_frame.rowconfigure(0, weight=1)
-        self.joy_frame.columnconfigure(0, weight=1)     # column 0 for button_frame
-        self.joy_frame.columnconfigure(1, weight=1)     # column 1 for axes_frame
+        self.joy_frame.columnconfigure(0, weight=1)     # column 0: for button_frame
+        self.joy_frame.columnconfigure(1, weight=1)     # column 1: for axes_frame
 
         # Create frame and canvas for the 'joy'buttons
         self.button_frame = ttk.Labelframe(self.joy_frame, relief='flat', text=' Buttons ')
@@ -189,7 +228,7 @@ class JoyTester(Node):
         self.axes_canvas = Canvas(self.axes_frame, width=250, background='lightgray')
         self.axes_canvas.grid(column=0, row=0)
 
-    def create_joy_button_widgets(self, button_count):
+    def create_joy_topic_button_widgets(self, button_count):
         """Create the widgets for the buttons in the joy message."""
         left_space = 10
         inner_space = 15
@@ -200,7 +239,7 @@ class JoyTester(Node):
             self.buttons.append(JoyButton(self.button_canvas, left_space, inner_space,
                                           width, v_space, height, i))
 
-    def create_joy_axes_widgets(self, axes_count):
+    def create_joy_topic_axes_widgets(self, axes_count):
         """Create the widgets for the axes in the joy message."""
         left_space = 10
         inner_space = 15
@@ -211,39 +250,16 @@ class JoyTester(Node):
             self.axes.append(JoyAxis(self.axes_canvas, left_space, inner_space,
                                      width, vert_space, height, i))
 
-    def joy_callback(self, joy_msg):
-        """Handle a receipt of a joy message."""
-        # Handle first receive
-        if not self.joy_objects_initialised:
-            button_count = len(joy_msg.buttons)
-            self.create_joy_button_widgets(button_count)
-
-            axes_count = len(joy_msg.axes)
-            self.create_joy_axes_widgets(axes_count)
-
-            self.joy_objects_initialised = True
-
-        # Update Values
-        for i, val in enumerate(joy_msg.buttons):
-            self.buttons[i].update_value(val)
-
-        for i, val in enumerate(joy_msg.axes):
-            self.axes[i].update_value(val)
-
-        # Redraw
-        self.tk.update()
-        return
-
-    def create_feedback_frames(self):
-        """Create the frame for the feedbackframes."""
+    def create_feedback_topic_frames(self):
+        """Create the frames for the feedback (subscribe and publish) messages."""
         self.feedback_frame = ttk.Labelframe(self.tk,
                                              borderwidth=1, relief='solid',
                                              padding=5, text='  Feedback topic   ')
         self.feedback_frame.grid(column=0, row=1)
 
         self.feedback_frame.rowconfigure(0, weight=1)
-        self.feedback_frame.columnconfigure(0, weight=1)     # column 0 for subscribe frame
-        self.feedback_frame.columnconfigure(1, weight=1)     # column 1 for publish frame
+        self.feedback_frame.columnconfigure(0, weight=1)     # column 0: for subscribe frame
+        self.feedback_frame.columnconfigure(1, weight=1)     # column 1: for publish frame
 
         # create subscribe feedback frame
         self.subscribe_frame = ttk.Labelframe(self.feedback_frame,
@@ -254,6 +270,9 @@ class JoyTester(Node):
                                        background='lightgray')
         self.subscribe_canvas.pack()
 
+        # Note [RbSCR]
+        # Feedback widgets are immediately created (in contrast to the button and axes widgets)
+        # because the number of widgets/feedback-types is known to be a fixed value.
         left_space = 5
         inner_space = 15
         width = 100
@@ -265,23 +284,11 @@ class JoyTester(Node):
                                       width, vert_space, height, JoyFeedback.TYPE_RUMBLE))
         self.feedback.append(Feedback(self.subscribe_canvas, left_space, inner_space,
                                       width, vert_space, height, JoyFeedback.TYPE_BUZZER))
-        # Note [RbSCR]
-        # Feedback widgets are immediately created (in contrast to the button and axis widgets)
-        # because the number of widgets/feedback-types is known to be a fixed value.
-
-    def feedback_callback(self, set_feedback_msg):
-        """Handle a receipt of a set_feedback message."""
-        t_stamp = self.get_clock().now()
-        self.feedback[set_feedback_msg.type].update_value(set_feedback_msg.intensity, t_stamp)
-
-        # Redraw
-        self.tk.update()
-        return
 
         # Note [RbSCR]
-        # Code for the publish frame and widgets for publishing feedback
-        # messages should go here. But 'ROS spin' and 'Tk mainloop' don't
-        # work together (mainloop is needed for the UI interaction).
+        # Code for the publish frame and widgets for publishing feedback messages should
+        # go here. But 'ROS spin' and 'Tk mainloop' don't work together (mainloop is needed
+        # for the UI interaction (a 'send' button and a slider to set the intensity value)).
         # A possible solution is to use asyncio.
 
 
